@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Print Shop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    body { font-family:"Lato",sans-serif; margin:0; padding:0; background:#f4f7fa; color:#333;}
+    header {background:#111;color:#fff;padding:1rem 2rem; display:flex;justify-content:space-between;align-items:center;}
+    header h1{margin:0;font-size:24px;}
+    header button{background:#007bff;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;}
+    header button:hover{background:#0056b3;}
+    .shop-section {padding:50px 20px;background:#fff;text-align:center;}
+    .shop-section h2{font-size:28px;margin-bottom:20px;letter-spacing:3px;text-transform:uppercase;color:#111;}
+    .products{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;}
+    .product{background:#f8f9fa;border:1px solid #ddd;border-radius:8px;width:280px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.1);transition:transform 0.3s;text-align:center;}
+    .product:hover{transform:translateY(-5px);}
+    .product img{max-width:100%;border-radius:8px;}
+    .product h3{margin:15px 0 5px;font-size:20px;}
+    .product p{font-size:18px;margin:10px 0;}
+    .product button{background:#28a745;color:#fff;padding:10px 18px;font-weight:bold;border-radius:4px;border:none;cursor:pointer;}
+    .product button:hover{background:#1f7c34;}
+    #cartDrawer{position:fixed;top:0;right:-400px;width:320px;height:100%;background:#fefefe;box-shadow:-2px 0 10px rgba(0,0,0,0.2);transition:right 0.3s;padding:20px;display:flex;flex-direction:column;z-index:1000;}
+    #cartDrawer.open{right:0;}
+    #cartDrawer h2{margin-top:0;font-size:22px;}
+    .cart-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;}
+    .cart-item button{background:none;border:none;color:#dc3545;font-size:16px;cursor:pointer;}
+    #checkoutBtn{margin-top:auto;background:#007bff;color:#fff;border:none;padding:12px;border-radius:4px;font-size:16px;cursor:pointer;}
+    #checkoutBtn:hover{background:#0056b3;}
+    footer{background:#282E34;color:#fff;text-align:center;padding:1rem 0;margin-top:2rem;}
+  </style>
+</head>
+<body>
+<header>
+  <h1>My Print Shop</h1>
+  <button onclick="toggleCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+</header>
+
+<section class="shop-section">
+  <h2>Our Products</h2>
+  <div class="products" id="productList"></div>
+</section>
+
+<div id="cartDrawer">
+  <h2>Your Cart</h2>
+  <div id="cartItems"></div>
+  <p><strong>Total: $<span id="cartTotal">0.00</span></strong></p>
+  <button id="checkoutBtn" onclick="checkout()">Checkout</button>
+</div>
+
+<footer>
+  <p>&copy; 2024 My Print Shop. All Rights Reserved.</p>
+</footer>
+
+<script>
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzyDO0Myxc5dQMPA_tJjhdlDMgNSm7-TLAWkNA5dndSTwjDWJS6GF-HDu7bCQzBTkJFlw/exec";
+
+const PRODUCTS = [
+  { id: "shirt-standard", title: "Classic Tee", price_cents: 2500, image:"https://via.placeholder.com/300x200?text=Classic+Tee", gelato_id:"YOUR_GELATO_TEE_ID" },
+  { id: "mug-standard", title: "Ceramic Mug", price_cents: 1500, image:"https://via.placeholder.com/300x200?text=Mug", gelato_id:"YOUR_GELATO_MUG_ID" }
+];
+
+let cart=[];
+
+function renderProducts(){
+  const list=document.getElementById("productList");
+  list.innerHTML="";
+  PRODUCTS.forEach(p=>{
+    list.innerHTML+=`<div class="product"><img src="${p.image}" alt="${p.title}"><h3>${p.title}</h3><p>$${(p.price_cents/100).toFixed(2)}</p><button onclick="addToCart('${p.id}')">Add to Cart</button></div>`;
+  });
+}
+
+function addToCart(productId){
+  const product=PRODUCTS.find(p=>p.id===productId);
+  const existing=cart.find(i=>i.id===productId);
+  if(existing) existing.qty++; else cart.push({...product, qty:1});
+  updateCart();
+}
+
+function removeFromCart(productId){
+  cart=cart.filter(i=>i.id!==productId);
+  updateCart();
+}
+
+function updateCart(){
+  const itemsDiv=document.getElementById("cartItems");
+  const count=cart.reduce((acc,i)=>acc+i.qty,0);
+  const total=cart.reduce((acc,i)=>acc+(i.qty*i.price_cents),0);
+  document.getElementById("cartCount").innerText=count;
+  document.getElementById("cartTotal").innerText=(total/100).toFixed(2);
+  itemsDiv.innerHTML=cart.map(i=>`<div class="cart-item"><span>${i.title} x${i.qty}</span><button onclick="removeFromCart('${i.id}')"><i class="fas fa-trash"></i></button></div>`).join("");
+}
+
+function toggleCart(){document.getElementById("cartDrawer").classList.toggle("open");}
+
+async function checkout(){
+  if(cart.length===0) return alert("Your cart is empty!");
+  const order={
+    currency:"usd",
+    items:cart.map(p=>({id:p.id,title:p.title,qty:p.qty,unit_price_cents:p.price_cents,print_provider_product_id:p.gelato_id}))
+  };
+  const resp=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"createCheckout",order})});
+  const data=await resp.json();
+  if(data.checkoutUrl) window.location.href=data.checkoutUrl;
+  else alert("Checkout error: "+JSON.stringify(data));
+}
+
+renderProducts();
+</script>
+</body>
+</html>
