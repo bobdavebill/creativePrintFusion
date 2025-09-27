@@ -55,11 +55,12 @@
 </footer>
 
 <script>
-const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzyDO0Myxc5dQMPA_tJjhdlDMgNSm7-TLAWkNA5dndSTwjDWJS6GF-HDu7bCQzBTkJFlw/exec";
+/** CHANGE THIS to your deployed Apps Script backend **/
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyEnlxrTP3ZQH8_LOdkbtcDTvSqLw2eqoQLT9_wfq6stkyNn3A5NaRGF_b1-050MCaogA/exec";
 
+/** Example products — replace gelato_id with your real Gelato product templates **/
 const PRODUCTS = [
-  { id: "shirt-standard", title: "Classic Tee", price_cents: 2500, image:"https://via.placeholder.com/300x200?text=Classic+Tee", gelato_id:"YOUR_GELATO_TEE_ID" },
-  { id: "mug-standard", title: "Ceramic Mug", price_cents: 1500, image:"https://via.placeholder.com/300x200?text=Mug", gelato_id:"YOUR_GELATO_MUG_ID" }
+  { id: "mug-standard", title: "Ceramic Mug", price_cents: 1500, image:"https://via.placeholder.com/300x200?text=Mug", gelato_id:"4ff9c091-0ce4-4c11-9970-8145c2c3acfb" }
 ];
 
 let cart=[];
@@ -68,7 +69,13 @@ function renderProducts(){
   const list=document.getElementById("productList");
   list.innerHTML="";
   PRODUCTS.forEach(p=>{
-    list.innerHTML+=`<div class="product"><img src="${p.image}" alt="${p.title}"><h3>${p.title}</h3><p>$${(p.price_cents/100).toFixed(2)}</p><button onclick="addToCart('${p.id}')">Add to Cart</button></div>`;
+    list.innerHTML+=`
+      <div class="product">
+        <img src="${p.image}" alt="${p.title}">
+        <h3>${p.title}</h3>
+        <p>$${(p.price_cents/100).toFixed(2)}</p>
+        <button onclick="addToCart('${p.id}')">Add to Cart</button>
+      </div>`;
   });
 }
 
@@ -90,21 +97,44 @@ function updateCart(){
   const total=cart.reduce((acc,i)=>acc+(i.qty*i.price_cents),0);
   document.getElementById("cartCount").innerText=count;
   document.getElementById("cartTotal").innerText=(total/100).toFixed(2);
-  itemsDiv.innerHTML=cart.map(i=>`<div class="cart-item"><span>${i.title} x${i.qty}</span><button onclick="removeFromCart('${i.id}')"><i class="fas fa-trash"></i></button></div>`).join("");
+  itemsDiv.innerHTML=cart.map(i=>
+    `<div class="cart-item">
+      <span>${i.title} x${i.qty}</span>
+      <button onclick="removeFromCart('${i.id}')"><i class="fas fa-trash"></i></button>
+    </div>`).join("");
 }
 
-function toggleCart(){document.getElementById("cartDrawer").classList.toggle("open");}
+function toggleCart(){
+  document.getElementById("cartDrawer").classList.toggle("open");
+}
 
 async function checkout(){
   if(cart.length===0) return alert("Your cart is empty!");
   const order={
     currency:"usd",
-    items:cart.map(p=>({id:p.id,title:p.title,qty:p.qty,unit_price_cents:p.price_cents,print_provider_product_id:p.gelato_id}))
+    items:cart.map(p=>({
+      id:p.id,
+      title:p.title,
+      qty:p.qty,
+      unit_price_cents:p.price_cents,
+      print_provider_product_id:p.gelato_id
+    }))
   };
-  const resp=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"createCheckout",order})});
-  const data=await resp.json();
-  if(data.checkoutUrl) window.location.href=data.checkoutUrl;
-  else alert("Checkout error: "+JSON.stringify(data));
+  try {
+    const resp=await fetch(BACKEND_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"createCheckout",order})
+    });
+    const data=await resp.json();
+    if(data.checkoutUrl){
+      window.location.href=data.checkoutUrl; // Stripe checkout
+    } else {
+      alert("Checkout error: "+JSON.stringify(data));
+    }
+  } catch(err){
+    alert("Checkout failed: "+err.message);
+  }
 }
 
 renderProducts();
